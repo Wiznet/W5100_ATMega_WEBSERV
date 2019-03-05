@@ -1,0 +1,115 @@
+###############################################################################
+# Makefile for the library module version of project W5100
+###############################################################################
+
+
+#
+#  Explicitly specify the target MCU and frequency.
+#  Explicitly specify the optimization level (i.e., "-Os")
+#
+#  Note that the only part of the W5100 library that
+#  is timing-sensitive is the call to _delay_ms() in some
+#  of the W5100 setup routines.  The value for MCU is
+#  not used and can be anything.  The value of F_CPU will
+#  dictate the timing of _delay_ms().
+#
+MCU = atmega128
+F_CPU = 20000000
+OPTIMIZE = -Os
+
+
+
+## General Flags
+PROJECT = w5100
+TARGET = lib$(PROJECT).a
+CC = avr-gcc
+AR = avr-ar rcs
+LIBRARY = c:\projects\library
+
+
+MSG_CREATING_LIBRARY = Creating library:
+
+
+
+#  Options common to compile, link and assembly rules
+#
+#  For the W5100 project, define the literal MAKE_LIBRARY
+#  to force the build of a linkable library image.
+#
+
+COMMON = -mmcu=$(MCU) -DF_CPU=$(F_CPU) -DMAKE_LIBRARY
+
+
+## Compile options common for all C compilation units.
+CFLAGS = $(COMMON)
+CFLAGS += -Wall -gdwarf-2 $(OPTIMIZE) -std=gnu99 -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums
+CFLAGS += -MD -MP -MT $(*F).o -MF dep/$(@F).d 
+
+## Assembly specific flags
+ASMFLAGS = $(COMMON)
+ASMFLAGS += $(CFLAGS)
+ASMFLAGS += -x assembler-with-cpp -Wa,-gdwarf2
+
+## Linker flags
+LDFLAGS = $(COMMON)
+LDFLAGS +=  -Wl,-Map=$(PROJECT).map
+
+
+## Intel Hex file production flags
+HEX_FLASH_FLAGS = -R .eeprom -R .fuse -R .lock -R .signature
+
+HEX_EEPROM_FLAGS = -j .eeprom
+HEX_EEPROM_FLAGS += --set-section-flags=.eeprom="alloc,load"
+HEX_EEPROM_FLAGS += --change-section-lma .eeprom=0 --no-change-warnings
+
+
+## Objects that must be built in order to link
+OBJECTS = $(PROJECT).o 
+
+## Objects explicitly added by the user
+LINKONLYOBJECTS = 
+
+## Build
+all: $(TARGET)
+
+
+## Compile
+$(PROJECT).o: ../$(PROJECT).c
+	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
+
+
+# Create library from object files.
+#.SECONDARY : $(TARGET).a
+#.PRECIOUS : $(OBJECTS)
+%.a: $(OBJECTS)
+	@echo
+	@echo $(MSG_CREATING_LIBRARY) $@
+	$(AR) $@ $(OBJECTS)
+	cp $@ $(LIBRARY)
+	rm $@
+
+
+
+
+##Link
+#$(TARGET): $(OBJECTS)
+#	 $(CC) $(LDFLAGS) $(OBJECTS) $(LINKONLYOBJECTS) $(LIBDIRS) $(LIBS) -o $(TARGET)
+#
+#%.hex: $(TARGET)
+#	avr-objcopy -O ihex $(HEX_FLASH_FLAGS)  $< $@
+#
+#%.eep: $(TARGET)
+#	-avr-objcopy $(HEX_EEPROM_FLAGS) -O ihex $< $@ || exit 0
+#
+#%.lss: $(TARGET)
+#	avr-objdump -h -S $< > $@
+
+## Clean target
+.PHONY: clean
+clean:
+	-rm -rf $(OBJECTS) $(PROJECT).elf dep/* $(PROJECT).hex $(PROJECT).eep $(PROJECT).lss $(PROJECT).map
+
+
+## Other dependencies
+-include $(shell mkdir dep 2>/dev/null) $(wildcard dep/*)
+
